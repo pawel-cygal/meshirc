@@ -1,0 +1,56 @@
+Screen {
+    layout: vertical;
+}
+
+Header {
+    height: 1;
+    background: $primary;
+    color: $text;
+}
+
+#main {
+    layout: horizontal;
+    height: 1fr;
+}
+
+BufferList {
+    width: 24;
+    background: $boost;
+    border-right: solid $accent;
+    display: none;
+}
+
+BufferList.visible {
+    display: block;
+}
+
+BufferView {
+    width: 1fr;
+    height: 1fr;
+}
+
+StatusBar {
+    height: 1;
+    background: $boost;
+    color: $text;
+}
+
+InputLine {
+    height: 1;
+    background: $surface;
+}
+
+.unread {
+    color: $warning;
+}
+
+.mention {
+    color: $error;
+    text-style: bold;
+}
+
+.active {
+    background: $accent;
+    color: $text;
+    text-style: bold;
+}
