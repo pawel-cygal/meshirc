@@ -5,7 +5,7 @@ channels and direct messages.
 
 ## Screenshot
 
-
+![meshirc terminal UI](docs/screenshot.svg)
 
 ## Install
 
