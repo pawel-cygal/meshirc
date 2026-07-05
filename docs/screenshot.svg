@@ -1,41 +1,72 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1160" height="720" viewBox="0 0 1160 720" role="img" aria-labelledby="title desc">
-  <title id="title">meshirc terminal UI screenshot</title>
-  <desc id="desc">A terminal chat interface with a channel sidebar, message buffer, status bar, and input line.</desc>
-  <rect width="1160" height="720" fill="#101418"/>
-  <rect x="24" y="24" width="1112" height="672" rx="8" fill="#141a20" stroke="#2d3945" stroke-width="2"/>
-  <rect x="24" y="24" width="1112" height="42" rx="8" fill="#1f2933"/>
-  <rect x="24" y="58" width="1112" height="8" fill="#1f2933"/>
-  <text x="44" y="51" fill="#f2f5f8" font-family="monospace" font-size="18" font-weight="700">meshirc</text>
-  <text x="154" y="51" fill="#9fb3c8" font-family="monospace" font-size="15">connected to serial:auto - node: LNX1</text>
+  <title id="title">meshirc terminal UI</title>
+  <desc id="desc">A Textual terminal UI with a one-line header, grouped buffer sidebar, message log, status line, and input prompt.</desc>
+  <style>
+    text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 16px; }
+    .dim { fill: #7a8599; }
+    .text { fill: #d7dde8; }
+    .bright { fill: #f4f7fb; }
+    .cyan { fill: #55d7ff; }
+    .green { fill: #7ee787; }
+    .yellow { fill: #f2cc60; }
+    .red { fill: #ff7b72; font-weight: 700; }
+    .reverse { fill: #111820; }
+  </style>
 
-  <rect x="24" y="66" width="238" height="558" fill="#11171d"/>
-  <line x1="262" y1="66" x2="262" y2="624" stroke="#2d3945" stroke-width="2"/>
-  <text x="44" y="104" fill="#7dd3fc" font-family="monospace" font-size="16" font-weight="700">Buffers</text>
-  <rect x="40" y="122" width="198" height="34" rx="4" fill="#24313d"/>
-  <text x="54" y="144" fill="#f8fafc" font-family="monospace" font-size="15">1: console</text>
-  <text x="54" y="190" fill="#cbd5e1" font-family="monospace" font-size="15">2: #primary</text>
-  <text x="54" y="226" fill="#cbd5e1" font-family="monospace" font-size="15">3: #local</text>
-  <text x="54" y="262" fill="#facc15" font-family="monospace" font-size="15">4: @BOB *</text>
-  <text x="54" y="298" fill="#cbd5e1" font-family="monospace" font-size="15">5: @ALICE</text>
+  <rect width="1160" height="720" fill="#0f1419"/>
 
-  <rect x="262" y="66" width="874" height="558" fill="#141a20"/>
-  <text x="292" y="106" fill="#64748b" font-family="monospace" font-size="15">[20:14] -*- connected to serial:auto</text>
-  <text x="292" y="142" fill="#64748b" font-family="monospace" font-size="15">[20:14] -*- known nodes: 5; use /nodes to list them</text>
-  <text x="292" y="196" fill="#94a3b8" font-family="monospace" font-size="15">[20:15]</text>
-  <text x="382" y="196" fill="#22d3ee" font-family="monospace" font-size="15">&lt;BOB&gt;</text>
-  <text x="446" y="196" fill="#e2e8f0" font-family="monospace" font-size="15">hello from the hill node</text>
-  <text x="292" y="232" fill="#94a3b8" font-family="monospace" font-size="15">[20:16]</text>
-  <text x="382" y="232" fill="#f8fafc" font-family="monospace" font-size="15">&lt;me&gt;</text>
-  <text x="430" y="232" fill="#e2e8f0" font-family="monospace" font-size="15">signal looks good from linux</text>
-  <text x="292" y="286" fill="#94a3b8" font-family="monospace" font-size="15">[20:18]</text>
-  <text x="382" y="286" fill="#a78bfa" font-family="monospace" font-size="15">&lt;ALICE&gt;</text>
-  <text x="462" y="286" fill="#fca5a5" font-family="monospace" font-size="15" font-weight="700">LNX1 can you copy?</text>
-  <text x="292" y="340" fill="#64748b" font-family="monospace" font-size="15">[20:19] -*- copied 4 lines from #primary using xclip</text>
+  <!-- Header: Textual Header is one terminal row. -->
+  <rect x="0" y="0" width="1160" height="28" fill="#23476f"/>
+  <text x="14" y="20" class="bright">meshirc</text>
+  <text x="104" y="20" fill="#c8d7ea">node:!1234abcd</text>
 
-  <rect x="24" y="624" width="1112" height="34" fill="#1f2933"/>
-  <text x="44" y="646" fill="#f8fafc" font-family="monospace" font-size="14">1:console  2:#primary  3:#local  4:@BOB*  5:@ALICE</text>
-  <text x="874" y="646" fill="#9fb3c8" font-family="monospace" font-size="14">Ctrl+N/P switch - Alt+B sidebar - Ctrl+Q quit</text>
-  <rect x="24" y="658" width="1112" height="38" rx="0" fill="#101418"/>
-  <text x="44" y="683" fill="#7dd3fc" font-family="monospace" font-size="16">Type here for #primary;</text>
-  <text x="252" y="683" fill="#e2e8f0" font-family="monospace" font-size="16">/msg BOB meet at relay</text>
+  <!-- Main area. BufferList is 24 terminal cells wide, visible by default. -->
+  <rect x="0" y="28" width="240" height="584" fill="#161d25"/>
+  <rect x="238" y="28" width="2" height="584" fill="#3c5268"/>
+  <rect x="240" y="28" width="920" height="584" fill="#0f1419"/>
+
+  <text x="16" y="62" class="dim">Status</text>
+  <rect x="8" y="76" width="224" height="28" fill="#3c5268"/>
+  <text x="16" y="96" class="bright">[1]   console</text>
+
+  <text x="16" y="140" class="dim">Channels</text>
+  <text x="16" y="174" class="text">[2]   #primary</text>
+  <text x="16" y="208" class="text">[3] : #local</text>
+
+  <text x="16" y="252" class="dim">DMs</text>
+  <text x="16" y="286" class="yellow">[4] * @BOB</text>
+  <text x="16" y="320" class="text">[5]   @ALICE</text>
+
+  <!-- BufferView: RichLog message format from meshirc.ui.widgets.buffer_view. -->
+  <text x="268" y="62" class="dim">[20:14] -*- meshirc ready</text>
+  <text x="268" y="96" class="dim">[20:14] -*- navigation: Tab -&gt; channel list, Enter -&gt; open, Esc -&gt; input</text>
+  <text x="268" y="130" class="dim">[20:14] -*- shortcuts: Ctrl+N/Ctrl+P, Ctrl+C copy, Ctrl+Q quit</text>
+  <text x="268" y="164" class="dim">[20:14] -*- connected to serial:auto</text>
+  <text x="268" y="198" class="dim">[20:14] -*- known nodes: 5; use /nodes to list them</text>
+
+  <text x="268" y="258" class="dim">[20:15]</text>
+  <text x="350" y="258" class="cyan">&lt;!8f4c2a10&gt;</text>
+  <text x="470" y="258" class="text">hello from the hill node</text>
+
+  <text x="268" y="292" class="dim">[20:16]</text>
+  <text x="350" y="292" class="bright">&lt;me&gt;</text>
+  <text x="406" y="292" class="text">signal looks good from linux</text>
+
+  <text x="268" y="326" class="dim">[20:18]</text>
+  <text x="350" y="326" class="green">&lt;!a8139441&gt;</text>
+  <text x="470" y="326" class="red">LNX1 can you copy?</text>
+
+  <text x="268" y="386" class="dim">[20:19] -*- copied 8 lines from console using xclip</text>
+
+  <!-- StatusBar: numbered buffers with '.', ':', '*' markers. -->
+  <rect x="0" y="612" width="1160" height="28" fill="#161d25"/>
+  <rect x="10" y="616" width="88" height="20" fill="#d7dde8"/>
+  <text x="14" y="632" class="reverse">1.console</text>
+  <text x="112" y="632" class="text">2.#primary 3:#local 4*@BOB 5.@ALICE</text>
+
+  <!-- InputLine: height 3, surface background, top border. -->
+  <rect x="0" y="640" width="1160" height="80" fill="#111820"/>
+  <rect x="0" y="640" width="1160" height="2" fill="#23476f"/>
+  <text x="16" y="672" class="dim">Type here for console; commands: /win 2, /nodes, /help</text>
+  <text x="16" y="702" class="text">/win 2</text>
 </svg>
