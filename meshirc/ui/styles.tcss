@@ -36,8 +36,15 @@ StatusBar {
 }
 
 InputLine {
-    height: 1;
+    height: 3;
     background: $surface;
+    color: $text;
+    border-top: solid $accent;
+    padding: 0 1;
+}
+
+InputLine:focus {
+    border-top: solid $primary;
 }
 
 .unread {

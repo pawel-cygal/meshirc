@@ -1,14 +1,19 @@
 import asyncio
+import concurrent.futures
 import difflib
+from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
-from textual.widgets import Header, Input
+from textual.widgets import Header, Input, ListView
 
-from meshirc.config import Config
+from meshirc.archive import MessageArchive
+from meshirc.banner import ASCII as STARTUP_BANNER
+from meshirc.clipboard import copy_to_system_clipboard
+from meshirc.config import Config, default_archive_path
 from meshirc.core.commands import (
     BuffersCmd,
     ClearCmd,
@@ -16,7 +21,9 @@ from meshirc.core.commands import (
     Command,
     CompletionContext,
     ConnectCmd,
+    CopyCmd,
     HelpCmd,
+    HistoryCmd,
     JoinCmd,
     MeCmd,
     MsgCmd,
@@ -39,8 +46,23 @@ from meshirc.ui.widgets.input_line import InputLine
 from meshirc.ui.widgets.status_bar import StatusBar
 
 COMMANDS = [
-    "/help", "/quit", "/msg", "/me", "/win", "/w", "/buffers", "/buf",
-    "/join", "/close", "/clear", "/connect", "/nodes", "/query", "/q",
+    "/help",
+    "/quit",
+    "/msg",
+    "/me",
+    "/win",
+    "/w",
+    "/buffers",
+    "/buf",
+    "/join",
+    "/close",
+    "/copy",
+    "/clear",
+    "/connect",
+    "/nodes",
+    "/history",
+    "/query",
+    "/q",
 ]
 
 
@@ -48,14 +70,15 @@ class MeshircApp(App[None]):
     CSS_PATH = Path(__file__).parent / "styles.tcss"
 
     BINDINGS = [
-        Binding("ctrl+c", "quit", "quit", show=False),
+        Binding("ctrl+c", "copy_buffer", "copy", priority=True),
+        Binding("ctrl+q", "quit", "quit", show=False),
         Binding("alt+b", "toggle_sidebar", "sidebar"),
-        Binding("alt+left", "prev_buffer", "prev"),
-        Binding("alt+right", "next_buffer", "next"),
-        *[
-            Binding(f"alt+{i}", f"select_buffer({i})", f"win {i}", show=False)
-            for i in range(1, 10)
-        ],
+        Binding("escape", "focus_input", "input", priority=True),
+        Binding("alt+left", "prev_buffer", "prev", priority=True),
+        Binding("alt+right", "next_buffer", "next", priority=True),
+        Binding("ctrl+p", "prev_buffer", "prev", priority=True),
+        Binding("ctrl+n", "next_buffer", "next", priority=True),
+        *[Binding(f"alt+{i}", f"select_buffer({i})", f"win {i}", show=False) for i in range(1, 10)],
     ]
 
     def __init__(self, transport: Transport, config: Config) -> None:
@@ -64,11 +87,16 @@ class MeshircApp(App[None]):
         self._config = config
         self._router: BufferRouter | None = None
         self._active_index = 0
-        self._queue: asyncio.Queue[TextMessage | NodeUpdate | Disconnect] = (
-            asyncio.Queue()
-        )
+        self._queue: asyncio.Queue[TextMessage | NodeUpdate | Disconnect] = asyncio.Queue()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._consume_task: asyncio.Task[None] | None = None
+        self._connect_task: asyncio.Task[None] | None = None
+        self._executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=2, thread_name_prefix="meshirc-transport"
+        )
+        self._last_clipboard_backend: str | None = None
+        archive_path = Path(config.archive.path) if config.archive.path else default_archive_path()
+        self._archive = MessageArchive(archive_path, enabled=config.archive.enabled)
 
     # ---- composition ----------------------------------------------------
 
@@ -78,41 +106,113 @@ class MeshircApp(App[None]):
             yield BufferList()
             yield BufferView(ts_format=self._config.ui.timestamp_format)
         yield StatusBar()
-        yield InputLine(completion_fn=self._completion_fn)
+        yield InputLine(completion_fn=self._completion_fn, id="input")
 
     async def on_mount(self) -> None:
         self._loop = asyncio.get_running_loop()
         self.title = "meshirc"
-        self.sub_title = f"connecting to {self._config.connection.host}..."
-
-        try:
-            await asyncio.get_running_loop().run_in_executor(
-                None, self._transport.start, self._post_event
-            )
-        except Exception as e:  # noqa: BLE001
-            self.sub_title = f"connect failed: {e}"
-            return
-
-        self._router = BufferRouter(
-            my_node_id=self._transport.my_node_id,
-            my_node_num=self._transport.my_node_num,
-            my_short_name=self._transport.my_short_name,
-        )
-        for idx, name in self._transport.list_channels().items():
-            self._router.ensure_channel(idx, name)
-        for n in self._transport.list_nodes():
-            num = int(n.node_id[1:], 16) if n.node_id.startswith("!") else 0
-            self._router.on_node_seen(num, n.long_name, n.short_name, n.last_heard)
-        self._router.on_system(f"connected to {self._config.connection.host}")
+        self._archive.open()
+        self._ensure_console_router()
+        self._show_startup_banner()
+        self._router.on_system("meshirc ready")
+        self._router.on_system("navigation: Tab -> channel list, Enter -> open, Esc -> input")
+        self._router.on_system("shortcuts: Ctrl+N/Ctrl+P, Ctrl+C copy, Ctrl+Q quit")
+        self._router.on_system(f"connecting to {self._transport.target_label}...")
+        self._refresh_all()
+        self.sub_title = f"connecting to {self._transport.target_label}..."
 
         if self._config.ui.sidebar_default:
             self._sidebar.add_class("visible")
 
-        self._active_index = 1 if len(self._router.buffers()) > 1 else 0
-        self._refresh_all()
-        self.sub_title = f"node:{self._transport.my_node_id}"
-
+        self.set_focus(self._input)
         self._consume_task = asyncio.create_task(self._consume_events())
+        self._connect_task = asyncio.create_task(self._connect_initial())
+
+    async def _connect_initial(self) -> None:
+        connected = await self._start_transport(initial=True)
+        if connected and self._router is not None:
+            self._active_index = 0
+            self.sub_title = f"node:{self._transport.my_node_id}"
+        self._refresh_all()
+        self.set_focus(self._input)
+
+    async def on_unmount(self) -> None:
+        for task in (self._connect_task, self._consume_task):
+            if task is not None and not task.done():
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+        self._archive.close()
+        self._executor.shutdown(wait=False, cancel_futures=True)
+
+    def _ensure_console_router(self) -> None:
+        if self._router is None:
+            self._router = BufferRouter(
+                my_node_id="?",
+                my_node_num=0,
+                my_short_name="meshirc",
+            )
+
+    async def _start_transport(self, *, initial: bool, target: str | None = None) -> bool:
+        loop = asyncio.get_running_loop()
+        try:
+            if initial:
+                await loop.run_in_executor(
+                    self._executor, self._transport.start, self._post_event
+                )
+            else:
+                await loop.run_in_executor(
+                    self._executor, lambda: self._transport.reconnect(target)
+                )
+        except Exception as e:  # noqa: BLE001
+            self._ensure_console_router()
+            self.sub_title = f"connect failed: {e}"
+            self._router.on_system(f"connect failed: {e}")
+            self._refresh_active()
+            return False
+
+        if initial:
+            self._router = BufferRouter(
+                my_node_id=self._transport.my_node_id,
+                my_node_num=self._transport.my_node_num,
+                my_short_name=self._transport.my_short_name,
+            )
+            self._show_startup_banner()
+        else:
+            self._ensure_console_router()
+
+        channels = self._transport.list_channels()
+        for idx, name in channels.items():
+            buf = self._router.ensure_channel(idx, name)
+            if not buf.messages:
+                buf.append(
+                    Message(
+                        ts=datetime.now(),
+                        from_id="system",
+                        text=f"{buf.name}: type a message and press Enter; use /win 1 for console",
+                    )
+                )
+                buf.mark_read()
+        nodes = self._transport.list_nodes()
+        for n in nodes:
+            num = int(n.node_id[1:], 16) if n.node_id.startswith("!") else 0
+            self._router.on_node_seen(num, n.long_name, n.short_name, n.last_heard)
+
+        prefix = "connected" if initial else "reconnected"
+        self._router.on_system(f"{prefix} to {self._transport.target_label}")
+        self._router.on_system(
+            f"local node: {self._transport.my_short_name} {self._transport.my_node_id}"
+        )
+        channel_names = ", ".join(channels.values()) if channels else "none"
+        self._router.on_system(f"channels: {channel_names}")
+        self._router.on_system(f"known nodes: {len(nodes)}; use /nodes to list them")
+        self.sub_title = f"node:{self._transport.my_node_id}"
+        return True
+
+    def _show_startup_banner(self) -> None:
+        assert self._router is not None
+        for line in STARTUP_BANNER:
+            self._router.on_system(line)
 
     # ---- event flow -----------------------------------------------------
 
@@ -132,17 +232,23 @@ class MeshircApp(App[None]):
                     if bufs[self._active_index] is buf:
                         self._buffer_view.append_message(buf.messages[-1])
                         buf.mark_read()
+                    self._archive_message(buf, buf.messages[-1], direction="in")
                     self._refresh_status()
             elif isinstance(evt, NodeUpdate):
                 num = int(evt.node_id[1:], 16) if evt.node_id.startswith("!") else 0
-                self._router.on_node_seen(
-                    num, evt.long_name, evt.short_name, evt.last_heard
-                )
+                self._router.on_node_seen(num, evt.long_name, evt.short_name, evt.last_heard)
             elif isinstance(evt, Disconnect):
                 self._router.on_system(f"disconnected: {evt.reason}")
                 self._refresh_active()
 
     # ---- input handling -------------------------------------------------
+
+    async def on_list_view_selected(self, event: ListView.Selected) -> None:
+        if isinstance(event.list_view, BufferList):
+            buffer_index = getattr(event.item, "buffer_index", None)
+            if buffer_index is not None:
+                self._select_buffer(buffer_index)
+                self.set_focus(self._input)
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         line = event.value
@@ -185,22 +291,22 @@ class MeshircApp(App[None]):
                 else:
                     self._router.on_system("cannot close console or channel")
                     self._refresh_active()
+            case CopyCmd():
+                self.action_copy_buffer()
             case ClearCmd():
                 active.messages.clear()
                 self._refresh_active()
             case NodesCmd():
                 for n in self._transport.list_nodes():
-                    self._router.on_system(
-                        f"  {n.short_name:8s} {n.long_name} {n.node_id}"
-                    )
+                    self._router.on_system(f"  {n.short_name:8s} {n.long_name} {n.node_id}")
                 self._refresh_active()
             case MeCmd(text=t):
                 await self._send_to_active(f"* {self._transport.my_short_name} {t}")
-            case ConnectCmd(host=h):
-                self._router.on_system(
-                    f"reconnect not implemented in MVP (host={h})"
-                )
+            case ConnectCmd(target=t):
+                self._router.on_system(f"reconnecting to {t or self._transport.target_label}...")
                 self._refresh_active()
+                if await self._start_transport(initial=False, target=t):
+                    self._refresh_all()
             case MsgCmd(target=tgt, text=text):
                 node_id = self._resolve_target(tgt)
                 if node_id is None:
@@ -221,6 +327,8 @@ class MeshircApp(App[None]):
                 if idx is None:
                     return
                 self._select_buffer(idx)
+            case HistoryCmd(limit=limit):
+                self._show_history(active.name, limit)
             case SendCmd(text=t):
                 if t == "":
                     return
@@ -246,7 +354,8 @@ class MeshircApp(App[None]):
         loop = asyncio.get_running_loop()
         try:
             packet_id = await loop.run_in_executor(
-                None, lambda: self._transport.send_text(text, channel=channel_idx)
+                self._executor,
+                lambda: self._transport.send_text(text, channel=channel_idx),
             )
         except Exception as e:  # noqa: BLE001
             self._router.on_system(f"send failed: {e}")
@@ -258,6 +367,7 @@ class MeshircApp(App[None]):
         if self._router.buffers()[self._active_index] is buf:
             self._buffer_view.append_message(buf.messages[-1])
             buf.mark_read()
+        self._archive_message(buf, buf.messages[-1], direction="out")
         self._refresh_status()
 
     async def _send_dm(self, node_id: str, text: str) -> None:
@@ -265,7 +375,8 @@ class MeshircApp(App[None]):
         loop = asyncio.get_running_loop()
         try:
             packet_id = await loop.run_in_executor(
-                None, lambda: self._transport.send_text(text, dest_id=node_id)
+                self._executor,
+                lambda: self._transport.send_text(text, dest_id=node_id),
             )
         except Exception as e:  # noqa: BLE001
             self._router.on_system(f"send failed: {e}")
@@ -277,7 +388,24 @@ class MeshircApp(App[None]):
         if self._router.buffers()[self._active_index] is buf:
             self._buffer_view.append_message(buf.messages[-1])
             buf.mark_read()
+        self._archive_message(buf, buf.messages[-1], direction="out")
         self._refresh_status()
+
+    def _archive_message(self, buf, msg: Message, *, direction: str) -> None:
+        self._archive.record(buf, msg, direction=direction)
+
+    def _show_history(self, buffer_name: str, limit: int) -> None:
+        assert self._router is not None
+        rows = self._archive.recent(buffer_name, limit=limit)
+        if not rows:
+            self._router.on_system(f"no archived messages for {buffer_name}")
+            self._refresh_active()
+            return
+        self._router.on_system(f"last {len(rows)} archived messages for {buffer_name}:")
+        for row in rows:
+            ts = row.ts.strftime(self._config.ui.timestamp_format)
+            self._router.on_system(f"  [{ts}] {row.from_id}: {row.text}")
+        self._refresh_active()
 
     # ---- resolution helpers ---------------------------------------------
 
@@ -315,6 +443,40 @@ class MeshircApp(App[None]):
 
     # ---- actions --------------------------------------------------------
 
+    def copy_to_clipboard(self, text: str) -> None:
+        self._last_clipboard_backend = copy_to_system_clipboard(text)
+        super().copy_to_clipboard(text)
+
+    def action_copy_buffer(self) -> None:
+        if self._router is None:
+            return
+        selected_text = self.screen.get_selected_text()
+        if selected_text:
+            self.copy_to_clipboard(selected_text)
+            backend = self._last_clipboard_backend or "terminal clipboard"
+            self._router.on_system(f"copied selection using {backend}")
+            self._refresh_active()
+            self.set_focus(self._input)
+            return
+
+        active = self._router.buffers()[self._active_index]
+        lines = []
+        for msg in active.messages:
+            ts = msg.ts.strftime(self._config.ui.timestamp_format)
+            if msg.from_id == "system":
+                lines.append(f"[{ts}] * {msg.text}")
+            else:
+                lines.append(f"[{ts}] <{msg.from_id}> {msg.text}")
+        text = "\n".join(lines)
+        if not text:
+            self._router.on_system(f"nothing to copy from {active.name}")
+        else:
+            self.copy_to_clipboard(text)
+            backend = self._last_clipboard_backend or "terminal clipboard"
+            self._router.on_system(f"copied {len(lines)} lines from {active.name} using {backend}")
+        self._refresh_active()
+        self.set_focus(self._input)
+
     def action_toggle_sidebar(self) -> None:
         self._sidebar.toggle()
         self._refresh_status()
@@ -329,6 +491,15 @@ class MeshircApp(App[None]):
     def action_next_buffer(self) -> None:
         if self._router and self._active_index < len(self._router.buffers()) - 1:
             self._select_buffer(self._active_index + 1)
+
+    def action_focus_sidebar(self) -> None:
+        if self._router is None:
+            return
+        self._sidebar.focus_buffer(self._active_index)
+        self.set_focus(self._sidebar)
+
+    def action_focus_input(self) -> None:
+        self.set_focus(self._input)
 
     def _select_buffer(self, index: int) -> None:
         if self._router is None:
@@ -357,7 +528,7 @@ class MeshircApp(App[None]):
 
     @property
     def _input(self) -> InputLine:
-        return self.query_one(InputLine)
+        return self.query_one("#input", InputLine)
 
     def _refresh_all(self) -> None:
         if self._router is None:
@@ -365,7 +536,7 @@ class MeshircApp(App[None]):
         bufs = self._router.buffers()
         active = bufs[self._active_index]
         self._buffer_view.set_buffer(active)
-        self._input.set_prompt(f"{active.name}> ")
+        self._input.set_prompt(f"Type here for {active.name}; commands: /win 2, /nodes, /help")
         self._refresh_status()
 
     def _refresh_active(self) -> None:
@@ -383,6 +554,7 @@ class MeshircApp(App[None]):
         bufs = self._router.buffers()
         self._status_bar.update_state(bufs, self._active_index)
         self._sidebar.update_state(bufs, self._active_index)
+        self._sidebar.focus_buffer(self._active_index)
 
     # ---- completion -----------------------------------------------------
 

@@ -7,22 +7,26 @@ EventHandler = Callable[[TextMessage | NodeUpdate | Disconnect], None]
 
 
 class Transport(Protocol):
-    """Generic transport interface so the app doesn't depend on TCPInterface directly."""
-
     my_node_id: str
     my_node_num: int
     my_short_name: str
 
+    @property
+    def target_label(self) -> str: ...
+
     def start(self, on_event: EventHandler) -> None:
-        """Connect and begin emitting events. Blocks until connected (or raises)."""
+        """Connect and begin emitting events."""
+
+    def reconnect(self, target: str | None = None) -> None:
+        """Reconnect to the same target or switch target first."""
 
     def send_text(
         self, text: str, *, channel: int | None = None, dest_id: str | None = None
     ) -> int:
-        """Send a text message. Returns packet_id assigned by the radio."""
+        """Send a text message and return the packet id."""
 
     def list_channels(self) -> dict[int, str]:
-        """Active channels: {index: name}. Index 0 always present."""
+        """Active channels by index."""
 
     def list_nodes(self) -> list[NodeUpdate]:
         """Snapshot of currently known nodes."""

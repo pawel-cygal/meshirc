@@ -6,7 +6,9 @@ from meshirc.core.commands import (
     CloseCmd,
     CompletionContext,
     ConnectCmd,
+    CopyCmd,
     HelpCmd,
+    HistoryCmd,
     JoinCmd,
     MeCmd,
     MsgCmd,
@@ -56,6 +58,10 @@ def test_close_active():
     assert parse("/close") == CloseCmd()
 
 
+def test_copy():
+    assert parse("/copy") == CopyCmd()
+
+
 def test_clear():
     assert parse("/clear") == ClearCmd()
 
@@ -74,11 +80,11 @@ def test_nodes():
 
 
 def test_connect_no_host():
-    assert parse("/connect") == ConnectCmd(host=None)
+    assert parse("/connect") == ConnectCmd(target=None)
 
 
 def test_connect_with_host():
-    assert parse("/connect 10.0.0.5") == ConnectCmd(host="10.0.0.5")
+    assert parse("/connect 10.0.0.5") == ConnectCmd(target="10.0.0.5")
 
 
 def test_msg_with_text():
@@ -108,6 +114,11 @@ def test_join_by_name():
     assert parse("/join #ogol") == JoinCmd(target="#ogol")
 
 
+def test_parse_history():
+    assert parse("/history") == HistoryCmd(limit=20)
+    assert parse("/history 5") == HistoryCmd(limit=5)
+
+
 def test_plain_text_is_send():
     assert parse("hello world") == SendCmd(text="hello world")
 
@@ -127,8 +138,24 @@ def test_empty_string_send():
 @pytest.fixture
 def ctx():
     return CompletionContext(
-        commands=["/help", "/quit", "/msg", "/me", "/win", "/buffers", "/join", "/close",
-                  "/clear", "/connect", "/nodes", "/query", "/buf", "/w", "/q"],
+        commands=[
+            "/help",
+            "/quit",
+            "/msg",
+            "/me",
+            "/win",
+            "/buffers",
+            "/join",
+            "/close",
+            "/clear",
+            "/connect",
+            "/nodes",
+            "/history",
+            "/query",
+            "/buf",
+            "/w",
+            "/q",
+        ],
         nodes=["BOB", "ALICE", "ALI3", "!22222222"],
         channels=["#default", "#ogol", "#trasa"],
         recent_in_buffer=["BOB", "ALICE"],

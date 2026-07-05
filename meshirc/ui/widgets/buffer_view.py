@@ -1,5 +1,6 @@
 import hashlib
 
+from textual import events
 from textual.widgets import RichLog
 
 from meshirc.core.models import Buffer, Message
@@ -20,6 +21,7 @@ class BufferView(RichLog):
 
     def __init__(self, ts_format: str = "%H:%M") -> None:
         super().__init__(highlight=False, markup=True, wrap=True, auto_scroll=True)
+        self.can_focus = False
         self._ts_format = ts_format
         self._current: Buffer | None = None
 
@@ -33,6 +35,10 @@ class BufferView(RichLog):
         if self._current is None:
             return
         self._render(msg)
+
+    def on_click(self, event: events.Click) -> None:
+        event.stop()
+        self.app.set_focus(self.app.query_one("#input"))
 
     def _render(self, msg: Message) -> None:
         ts = msg.ts.strftime(self._ts_format)

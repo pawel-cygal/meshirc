@@ -36,6 +36,11 @@ class CloseCmd:
 
 
 @dataclass(frozen=True)
+class CopyCmd:
+    pass
+
+
+@dataclass(frozen=True)
 class ClearCmd:
     pass
 
@@ -52,7 +57,7 @@ class NodesCmd:
 
 @dataclass(frozen=True)
 class ConnectCmd:
-    host: str | None
+    target: str | None
 
 
 @dataclass(frozen=True)
@@ -71,14 +76,31 @@ class JoinCmd:
     target: str
 
 
+@dataclass(frozen=True)
+class HistoryCmd:
+    limit: int = 20
+
+
 Command = (
-    SendCmd | QuitCmd | HelpCmd | WinCmd | BuffersCmd | CloseCmd | ClearCmd
-    | MeCmd | NodesCmd | ConnectCmd | MsgCmd | QueryCmd | JoinCmd
+    SendCmd
+    | QuitCmd
+    | HelpCmd
+    | WinCmd
+    | BuffersCmd
+    | CloseCmd
+    | CopyCmd
+    | ClearCmd
+    | MeCmd
+    | NodesCmd
+    | ConnectCmd
+    | MsgCmd
+    | QueryCmd
+    | JoinCmd
+    | HistoryCmd
 )
 
 
 def _split(rest: str, n: int) -> list[str]:
-    """Split rest into at most n parts (last part keeps spaces)."""
     return rest.split(maxsplit=n - 1) if rest else []
 
 
@@ -99,10 +121,22 @@ def parse(line: str) -> Command:
             return BuffersCmd()
         case "close":
             return CloseCmd()
+        case "copy":
+            return CopyCmd()
         case "clear":
             return ClearCmd()
         case "nodes":
             return NodesCmd()
+        case "history":
+            if not rest:
+                return HistoryCmd()
+            try:
+                limit = int(rest.strip())
+            except ValueError as e:
+                raise ParseError("usage: /history [limit]") from e
+            if limit < 1:
+                raise ParseError("usage: /history [limit]")
+            return HistoryCmd(limit=limit)
         case "win" | "w":
             if not rest:
                 raise ParseError("usage: /win <N>")
@@ -115,8 +149,8 @@ def parse(line: str) -> Command:
                 raise ParseError("usage: /me <action>")
             return MeCmd(text=rest)
         case "connect":
-            host = rest.strip() or None
-            return ConnectCmd(host=host)
+            target = rest.strip() or None
+            return ConnectCmd(target=target)
         case "msg":
             args = _split(rest, 2)
             if len(args) < 2:
@@ -150,7 +184,6 @@ def _ci_prefix(candidates: list[str], prefix: str) -> list[str]:
 
 
 def complete(line: str, cursor: int, ctx: CompletionContext) -> list[str]:
-    """Return completion candidates for the word at `cursor` in `line`."""
     head = line[:cursor]
 
     if head.startswith("/") and " " not in head:
@@ -163,11 +196,11 @@ def complete(line: str, cursor: int, ctx: CompletionContext) -> list[str]:
         ("/join ", ctx.channels),
     ):
         if head.startswith(prefix_cmd):
-            target_prefix = head[len(prefix_cmd):]
+            target_prefix = head[len(prefix_cmd) :]
             return _ci_prefix(pool, target_prefix)
 
     at = head.rfind("@")
     if at != -1 and (at == 0 or head[at - 1].isspace()):
-        return _ci_prefix(ctx.recent_in_buffer, head[at + 1:])
+        return _ci_prefix(ctx.recent_in_buffer, head[at + 1 :])
 
     return []

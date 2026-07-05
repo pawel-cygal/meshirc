@@ -4,14 +4,16 @@ from collections.abc import Callable
 from textual import events
 from textual.widgets import Input
 
+from meshirc.clipboard import get_system_clipboard
+
 CompletionFn = Callable[[str, int], list[str]]
 
 
 class InputLine(Input):
     """Input with prompt prefix, command history, and tab completion."""
 
-    def __init__(self, completion_fn: CompletionFn) -> None:
-        super().__init__(placeholder="")
+    def __init__(self, completion_fn: CompletionFn, id: str | None = None) -> None:
+        super().__init__(placeholder="", id=id, select_on_focus=False)
         self._completion = completion_fn
         self._history: deque[str] = deque(maxlen=200)
         self._history_pos: int | None = None
@@ -27,9 +29,18 @@ class InputLine(Input):
         self._draft = ""
 
     async def _on_key(self, event: events.Key) -> None:
+        alt_digit_chars = {"≠": 1, "²": 2, "³": 3, "¢": 4, "€": 5}
+        if event.character in alt_digit_chars:
+            event.prevent_default()
+            event.stop()
+            self.app.action_select_buffer(alt_digit_chars[event.character])
+            return
         if event.key == "tab":
             event.prevent_default()
             event.stop()
+            if not self.value.strip():
+                self.app.action_focus_sidebar()
+                return
             candidates = self._completion(self.value, self.cursor_position)
             if len(candidates) == 1:
                 self._apply_completion(candidates[0])
@@ -43,6 +54,14 @@ class InputLine(Input):
             event.prevent_default()
             event.stop()
             self._history_forward()
+
+    def action_paste(self) -> None:
+        clipboard = get_system_clipboard()
+        if clipboard is None:
+            super().action_paste()
+            return
+        start, end = self.selection
+        self.replace(clipboard, start, end)
 
     def _apply_completion(self, candidate: str) -> None:
         line = self.value

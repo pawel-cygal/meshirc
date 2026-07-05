@@ -50,6 +50,8 @@ class BufferRouter:
         if node_id not in self._dms:
             display = self._nodes.get(node_id)
             display_name = display.short_name if display else node_id
+            if not display_name.startswith("@"):
+                display_name = f"@{display_name}"
             self._dms[node_id] = Buffer(
                 kind=BufferKind.DM,
                 name=display_name,
