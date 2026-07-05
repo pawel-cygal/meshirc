@@ -3,6 +3,10 @@
 Terminal chat client for Meshtastic. The UI is built around IRC-style buffers,
 channels and direct messages.
 
+## Screenshot
+
+![meshirc terminal UI](docs/screenshot.svg)
+
 ## Install
 
 ```bash
@@ -29,7 +33,7 @@ meshirc
 To choose a specific USB device:
 
 ```bash
-meshirc devices
+meshirc devices        # or: meshirc --list-devices
 meshirc --serial /dev/ttyACM0
 ```
 
@@ -133,7 +137,7 @@ start a DM, or `/query <node>` to open the buffer without sending.
 | `Ctrl+N` / `Ctrl+P` | next/previous buffer |
 | `Alt+B` | toggle sidebar |
 | `Alt+Left/Right` | prev/next buffer |
-| `PgUp/PgDn` | scroll buffer |
+| `Up/Down` in input | command history |
 | `Tab` | autocomplete |
 | `Ctrl+C` | copy selected text, or the current buffer when nothing is selected |
 | `Ctrl+V` | paste from the system clipboard into the input line |
@@ -163,15 +167,15 @@ Textual selection. If the terminal itself needs to select raw screen text, hold
 ```text
 /help
 /quit
-/win N
-/buffers
+/win N                 switch to buffer N; alias: /w
+/buffers               toggle sidebar; alias: /buf
 /close
 /copy
 /clear
 /me <action>
 /nodes
 /msg <node> <text>
-/query <node>
+/query <node>          open a DM buffer; alias: /q
 /join <#chan|N>
 /connect [target]
 /history [limit]

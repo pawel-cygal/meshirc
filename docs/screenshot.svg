@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="720" viewBox="0 0 1160 720" role="img" aria-labelledby="title desc">
+  <title id="title">meshirc terminal UI screenshot</title>
+  <desc id="desc">A terminal chat interface with a channel sidebar, message buffer, status bar, and input line.</desc>
+  <rect width="1160" height="720" fill="#101418"/>
+  <rect x="24" y="24" width="1112" height="672" rx="8" fill="#141a20" stroke="#2d3945" stroke-width="2"/>
+  <rect x="24" y="24" width="1112" height="42" rx="8" fill="#1f2933"/>
+  <rect x="24" y="58" width="1112" height="8" fill="#1f2933"/>
+  <text x="44" y="51" fill="#f2f5f8" font-family="monospace" font-size="18" font-weight="700">meshirc</text>
+  <text x="154" y="51" fill="#9fb3c8" font-family="monospace" font-size="15">connected to serial:auto - node: LNX1</text>
+
+  <rect x="24" y="66" width="238" height="558" fill="#11171d"/>
+  <line x1="262" y1="66" x2="262" y2="624" stroke="#2d3945" stroke-width="2"/>
+  <text x="44" y="104" fill="#7dd3fc" font-family="monospace" font-size="16" font-weight="700">Buffers</text>
+  <rect x="40" y="122" width="198" height="34" rx="4" fill="#24313d"/>
+  <text x="54" y="144" fill="#f8fafc" font-family="monospace" font-size="15">1: console</text>
+  <text x="54" y="190" fill="#cbd5e1" font-family="monospace" font-size="15">2: #primary</text>
+  <text x="54" y="226" fill="#cbd5e1" font-family="monospace" font-size="15">3: #local</text>
+  <text x="54" y="262" fill="#facc15" font-family="monospace" font-size="15">4: @BOB *</text>
+  <text x="54" y="298" fill="#cbd5e1" font-family="monospace" font-size="15">5: @ALICE</text>
+
+  <rect x="262" y="66" width="874" height="558" fill="#141a20"/>
+  <text x="292" y="106" fill="#64748b" font-family="monospace" font-size="15">[20:14] -*- connected to serial:auto</text>
+  <text x="292" y="142" fill="#64748b" font-family="monospace" font-size="15">[20:14] -*- known nodes: 5; use /nodes to list them</text>
+  <text x="292" y="196" fill="#94a3b8" font-family="monospace" font-size="15">[20:15]</text>
+  <text x="382" y="196" fill="#22d3ee" font-family="monospace" font-size="15">&lt;BOB&gt;</text>
+  <text x="446" y="196" fill="#e2e8f0" font-family="monospace" font-size="15">hello from the hill node</text>
+  <text x="292" y="232" fill="#94a3b8" font-family="monospace" font-size="15">[20:16]</text>
+  <text x="382" y="232" fill="#f8fafc" font-family="monospace" font-size="15">&lt;me&gt;</text>
+  <text x="430" y="232" fill="#e2e8f0" font-family="monospace" font-size="15">signal looks good from linux</text>
+  <text x="292" y="286" fill="#94a3b8" font-family="monospace" font-size="15">[20:18]</text>
+  <text x="382" y="286" fill="#a78bfa" font-family="monospace" font-size="15">&lt;ALICE&gt;</text>
+  <text x="462" y="286" fill="#fca5a5" font-family="monospace" font-size="15" font-weight="700">LNX1 can you copy?</text>
+  <text x="292" y="340" fill="#64748b" font-family="monospace" font-size="15">[20:19] -*- copied 4 lines from #primary using xclip</text>
+
+  <rect x="24" y="624" width="1112" height="34" fill="#1f2933"/>
+  <text x="44" y="646" fill="#f8fafc" font-family="monospace" font-size="14">1:console  2:#primary  3:#local  4:@BOB*  5:@ALICE</text>
+  <text x="874" y="646" fill="#9fb3c8" font-family="monospace" font-size="14">Ctrl+N/P switch - Alt+B sidebar - Ctrl+Q quit</text>
+  <rect x="24" y="658" width="1112" height="38" rx="0" fill="#101418"/>
+  <text x="44" y="683" fill="#7dd3fc" font-family="monospace" font-size="16">Type here for #primary;</text>
+  <text x="252" y="683" fill="#e2e8f0" font-family="monospace" font-size="16">/msg BOB meet at relay</text>
+</svg>
